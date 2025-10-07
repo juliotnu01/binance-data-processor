@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   kafka:
@@ -8,100 +8,104 @@ services:
       - "29092:29092"
     environment:
       KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: 'broker,controller'
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT'
-      KAFKA_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092,CONTROLLER://kafka:29093'
-      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092'
-      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
-      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
-      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_LISTENERS: "PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092,CONTROLLER://kafka:29093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:29093"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
       CLUSTER_ID: ${KAFKA_CLUSTER_ID}
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
-      
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     volumes:
       - kafka_data:/var/lib/kafka/data
-  
-  data_orchestrator:
-    build: ./services/data_orchestrator/
-    volumes:
-      - ./data:/app/data
-    environment:
-      - MAX_LEVERAGE=75
-      - SYMBOLS_FILE_PATH=/app/data/symbols.txt
-      - BINANCE_API_KEY=${BINANCE_API_KEY}
-      - BINANCE_API_SECRET=${BINANCE_API_SECRET}
-    restart: "no"
 
-  data_ingestor_multi:
-    build: ./services/data_ingestor_multi/
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    container_name: binance-data-processor-kafka-ui-1
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092 # Usa el nombre del servicio
+    ports:
+      - "8081:8080" # Usa otro puerto para no chocar con AKHQ si lo pruebas
     depends_on:
       - kafka
-      - data_orchestrator
-    volumes:
-      - ./data:/app/data
-    environment:
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
-      - TOPIC_NAME=binance_public_trades
-    restart: unless-stopped
-    deploy:
-      replicas: 0
+
+  # data_orchestrator:
+  #   build: ./services/data_orchestrator/
+  #   volumes:
+  #     - ./data:/app/data
+  #   environment:
+  #     - MAX_LEVERAGE=75
+  #     - SYMBOLS_FILE_PATH=/app/data/symbols.txt
+  #     - BINANCE_API_KEY=${BINANCE_API_KEY}
+  #     - BINANCE_API_SECRET=${BINANCE_API_SECRET}
+  #   restart: "no"
+
+  # data_ingestor_multi:
+  #   build: ./services/data_ingestor_multi/
+  #   depends_on:
+  #     - kafka
+  #     - data_orchestrator
+  #   volumes:
+  #     - ./data:/app/data
+  #   environment:
+  #     - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+  #     - TOPIC_NAME=binance_public_trades
+  #   restart: unless-stopped
+  #   deploy:
+  #     replicas: 0
 
   data_ingestor_public:
     build: ./services/data_ingestor/
     depends_on:
       - kafka
-    environment:
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
-      - BINANCE_WS_URL=wss://fstream.binance.com/ws/
-      - TOPIC_NAME=binance_public_trades
-      - MAX_LEVERAGE=75
-      - AGGREGATION_INTERVAL=5
-      - BATCH_SIZE=10
-      - BATCH_DELAY=1
+    env_file:
+      - ./.env
     restart: unless-stopped
 
-  data_ingestor_user:
-    build: ./services/data_ingestor/
-    depends_on:
-      - kafka
-    environment:
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
-      - BINANCE_WS_URL=wss://fstream.binance.com/ws/
-      - TOPIC_NAME=binance_user_orders
-      - API_KEY=${BINANCE_API_KEY}
-      - API_SECRET=${BINANCE_API_SECRET}
-    restart: unless-stopped
+  # data_ingestor_user:
+  #   build: ./services/data_ingestor/
+  #   depends_on:
+  #     - kafka
+  #   environment:
+  #     - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+  #     - BINANCE_WS_URL=wss://fstream.binance.com/ws/
+  #     - TOPIC_NAME=binance_user_orders
+  #     - API_KEY=${BINANCE_API_KEY}
+  #     - API_SECRET=${BINANCE_API_SECRET}
+  #   restart: unless-stopped
 
-  algorithm_a:
-    build: ./services/algorithms/algorithm_a/
-    depends_on:
-      - kafka
-    environment:
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
-      - INPUT_TOPIC=binance_public_trades
-      - OUTPUT_TOPIC=signals_scalping
-    restart: unless-stopped
+  # algorithm_a:
+  #   build: ./services/algorithms/algorithm_a/
+  #   depends_on:
+  #     - kafka
+  #   environment:
+  #     - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+  #     - INPUT_TOPIC=binance_public_trades
+  #     - OUTPUT_TOPIC=signals_scalping
+  #   restart: unless-stopped
 
-  algorithm_b:
-    build: ./services/algorithms/algorithm_b/
-    depends_on:
-      - kafka
-    environment:
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
-      - INPUT_TOPIC=binance_public_trades
-      - OUTPUT_TOPIC=signals_momentum
-    restart: unless-stopped
+  # algorithm_b:
+  #   build: ./services/algorithms/algorithm_b/
+  #   depends_on:
+  #     - kafka
+  #   environment:
+  #     - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+  #     - INPUT_TOPIC=binance_public_trades
+  #     - OUTPUT_TOPIC=signals_momentum
+  #   restart: unless-stopped
 
   nats:
     image: nats:latest
     ports:
       - "4222:4222"
       - "8222:8222"
-    command: "-js"  # JetStream enabled
+    command: "-js" # JetStream enabled
 
   api_gateway:
     build: ./services/api_gateway/

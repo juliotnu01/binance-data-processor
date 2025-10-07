@@ -20,9 +20,6 @@ up: init
 	@echo ">>> Levantando servicios con Docker Compose..."
 	@docker-compose up -d
 	@echo ">>> ¡Servicios en marcha! Usa 'make logs' para ver la salida."
-	@SYMBOL_COUNT=$$(wc -l < ./data/symbols.txt); \
-	echo ">>> Encontrados $$SYMBOL_COUNT símbolos. Escalando ingestores..."; \
-	docker-compose up -d --scale data_ingestor_multi=$$SYMBOL_COUNT
 	@echo ">>> El cliente web está disponible en http://localhost:8080"
 
 # Detiene los servicios
