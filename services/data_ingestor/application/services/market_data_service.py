@@ -33,6 +33,17 @@ class MarketDataService:
     
     async def initialize(self) -> None:
         """Inicializar el servicio"""
+        """Publica el estado de conexión."""
+        status_message = {
+            'event_type': 'connection_status',
+            'status': 'connected',
+            'timestamp': int(time.time() * 1000)
+        }
+        
+        # Publicar en el tópico de estado
+        self.kafka_publisher.publish(self.config.kafka.topic_connection_status, status_message)
+        logger.info(f"🎯 Estado de conexión publicado en {self.config.kafka.topic_connection_status}")
+        
         # Ya no nos conectamos a NATS
         # await self.nats_publisher.connect()
         
@@ -112,17 +123,14 @@ class MarketDataService:
                     'taker_buy_quote_volume': candle.taker_buy_quote_volume,
                     'timestamp': candle.close_time
                 }
-                # Publicar con el símbolo como clave
-                self.kafka_publisher.publish(self.config.kafka.topic_name, candle_event, key=pair.symbol)
             
-            await asyncio.sleep(0.1)
-
+            # Publicar evento de finalización
         end_event = {
             'event_type': 'historical_data_loaded',
             'total_pairs_with_candles': len([p for p in self.market_data.pairs if p.candles]),
             'timestamp': int(time.time() * 1000)
         }
-        self.kafka_publisher.publish(self.config.kafka.topic_name, end_event)
+        self.kafka_publisher.publish(self.config.kafka.topic_historical_klines, end_event)
         logger.info("✅ Carga y publicación de datos históricos completada.")
 
     # Eliminamos los métodos de publicación periódica y de NATS

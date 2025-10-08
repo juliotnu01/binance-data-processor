@@ -11,7 +11,7 @@ class KafkaConfig:
     topic_connection_status: str = os.getenv('TOPIC_CONNECTION_STATUS', 'connection_status')
     topic_historical_klines: str = os.getenv('TOPIC_HISTORICAL_KLINES', 'historical_klines')
     topic_realtime_klines: str = os.getenv('TOPIC_REALTIME_KLINES', 'realtime_klines')
-
+    output_topic: str = os.getenv('OUTPUT_TOPIC', 'rsi_signals')
 @dataclass
 class RSIConfig:
     period: int = int(os.getenv('RSI_PERIOD', '14'))

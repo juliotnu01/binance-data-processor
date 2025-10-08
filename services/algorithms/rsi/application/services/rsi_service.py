@@ -7,7 +7,7 @@ import asyncio
 from config.settings import Config
 from infrastructure.kafka_consumer import KafkaRSIConsumer
 from infrastructure.kafka_producer import KafkaMessagePublisher
-from application.use_cases.calculate_rsi import CalculateRSIUseCase
+from application.services.rsi_state_manager import RSIStateManager
 from utils.logger import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ class RSIService:
     def __init__(self, config: Config):
         self.config = config
         self.producer = KafkaMessagePublisher(config)
-        self.rsi_calculator = CalculateRSIUseCase(config)
+        self.state_manager = RSIStateManager(config)
         self.consumer = KafkaRSIConsumer(config, self.handle_message)
         self.running = True
 
@@ -33,18 +33,32 @@ class RSIService:
         """Maneja cada mensaje consumido de Kafka."""
         try:
             event = message.value
-            # Solo procesamos eventos de kline cerrados para que el RSI sea consistente
-            if event.get('event_type') == 'kline':
-                logger.debug(f"🕯️ Procesando vela cerrada para {event.get('symbol')}")
-                rsi_signal = self.rsi_calculator.process_kline_event(event)
+            event_type = event.get('event_type')
+            symbol = event.get('symbol')
+
+            if event_type == 'historical_kline':
+                # Este es un mensaje del lote histórico, lo ignoramos por ahora
+                # La inicialización se hará con ksqlDB
+                logger.debug(f"📜 Ignorando vela histórica individual para {symbol}. La inicialización se hará con ksqlDB.")
+                return
+
+            if event_type == 'historical_data_loaded':
+                # Señal de que el lote histórico está completo. Aquí es donde ksqlDB haría su trabajo.
+                # Por ahora, lo omitimos.
+                logger.info("📚 Señal de datos históricos cargados recibida.")
+                return
+
+            if event_type == 'realtime_klines':
+                logger.debug(f"🕯️ Procesando vela en tiempo real para {symbol}")
+                rsi_signal = self.state_manager.process_realtime_kline(event)
                 
-                # Publicar la señal de RSI en el tópico de salida
-                self.producer.publish(
-                    self.config.kafka.output_topic, 
-                    rsi_signal.__dict__, 
-                    key=rsi_signal.symbol
-                )
-                logger.info(f"✅ Señal RSI para {rsi_signal.symbol} publicada. Valor: {rsi_signal.value:.2f}")
+                if rsi_signal:
+                    self.producer.publish(
+                        self.config.kafka.output_topic, 
+                        rsi_signal.__dict__, 
+                        key=rsi_signal.symbol
+                    )
+                    logger.info(f"✅ Señal RSI para {rsi_signal.symbol} publicada. Valor: {rsi_signal.value:.2f}")
         except Exception as e:
             logger.error(f"❌ Error en handle_message: {e}")
 

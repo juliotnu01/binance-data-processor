@@ -13,19 +13,15 @@ class StreamMarketDataUseCase:
         self.kafka_publisher = kafka_publisher # <-- Guardar publisher
     
     def handle_kline_message(self, data: Dict[str, Any]) -> None:
-        """Maneja mensajes de klines del WebSocket y los publica en Kafka con clave."""
-        logger.debug(f"🕯️ Entrando en el manejador de klines con datos: {data}")
+        """Maneja mensajes de klines del WebSocket y los publica en el tópico de tiempo real."""
         try:
             if 'data' not in data or 'k' not in data['data']:
-                logger.warning("🚨 Mensaje de kline recibido pero no tiene la estructura esperada ('data' o 'k').")
                 return
             
             kline_data = data['data']['k']
             symbol = kline_data['s']
             is_kline_closed = kline_data['x']
             event_type = data['data']['e']
-
-            logger.info(f"🕯️ Vela recibida para {symbol}. ¿Cerrada?: {is_kline_closed}. Precio: {kline_data['c']}")
 
             candle_event = {
                 'event_type': event_type,
@@ -44,9 +40,13 @@ class StreamMarketDataUseCase:
                 'timestamp': int(kline_data['T'])
             }
 
-            topic = self.kafka_publisher.config.kafka.topic_name
+            # Publicar en el tópico de velas en tiempo real
+            topic = self.kafka_publisher.config.kafka.topic_realtime_klines
             if self.kafka_publisher.publish(topic, candle_event, key=symbol):
-                logger.info(f"✅ Vela de {symbol} enviada a Kafka. Clave: {symbol}")
+                if is_kline_closed:
+                    logger.info(f"🕯️ Vela cerrada enviada a {topic}: {symbol} - Cierre: {candle_event['close']}")
+                else:
+                    logger.debug(f"📈 Vela actualizada enviada a {topic}: {symbol}")
             else:
                 logger.error(f"❌ Fallo al publicar vela para {symbol} en Kafka")
                 

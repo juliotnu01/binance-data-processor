@@ -6,6 +6,9 @@ from typing import Optional
 class KafkaConfig:
     bootstrap_servers: str = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'kafka:29092')
     topic_name: str = os.getenv('TOPIC_NAME', 'binance_public_trades')
+    topic_connection_status: str = os.getenv('TOPIC_CONNECTION_STATUS', 'connection_status')
+    topic_historical_klines: str = os.getenv('TOPIC_HISTORICAL_KLINES', 'historical_klines')
+    topic_realtime_klines: str = os.getenv('TOPIC_REALTIME_KLINES', 'realtime_klines')
 
 @dataclass
 class BinanceConfig:
