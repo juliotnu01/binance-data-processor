@@ -31,7 +31,6 @@ class KafkaMessagePublisher(MessagePublisher):
                 logger.info(f"🔄 Intento {i+1}/{max_retries} de conectar a Kafka...")
                 self.producer = KafkaProducer(
                     bootstrap_servers=self.config.kafka.bootstrap_servers,
-                    # La clave se serializará como string
                     key_serializer=lambda k: k.encode('utf-8') if k else None,
                     value_serializer=lambda v: json.dumps(v).encode('utf-8'),
                     api_version=(2, 0, 2),
@@ -39,7 +38,7 @@ class KafkaMessagePublisher(MessagePublisher):
                     request_timeout_ms=30000
                 )
                 # Test de conexión
-                future = self.producer.send(self.config.kafka.topic_name, {'status': 'connected'})
+                future = self.producer.send(self.config.kafka.output_topic, {'status': 'connected'})
                 future.get(timeout=10)
                 logger.info("✅ Conectado a Kafka exitosamente!")
                 return
@@ -60,6 +59,7 @@ class KafkaMessagePublisher(MessagePublisher):
         except KafkaError as e:
             logger.error(f"❌ Error enviando mensaje a Kafka: {e}")
         return False
+    
     def flush(self) -> None:
         """Fuerza el envío de todos los mensajes pendientes en el buffer del productor."""
         if self.producer:

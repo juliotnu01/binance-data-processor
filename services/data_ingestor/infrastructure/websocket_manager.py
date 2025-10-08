@@ -17,72 +17,71 @@ class WebSocketManager:
         self.websockets = {}
         self.running = True
         self.message_handlers: Dict[str, Callable] = {}
-    
+
     def register_handler(self, stream_type: str, handler: Callable) -> None:
-        """Registra un manejador para un tipo de stream"""
         self.message_handlers[stream_type] = handler
-    
+
     def start_all_streams(self, symbols: List[str]) -> None:
-        """Inicia streams para todos los símbolos de trading"""
         if not symbols:
             logger.error("❌ No hay símbolos para iniciar streams")
             return
-            
+
         logger.info(f"🎯 Iniciando streams WebSocket para {len(symbols)} símbolos...")
-        
-        # Agrupar símbolos en streams combinados (máximo 200 por stream)
-        streams = []
-        for i in range(0, len(symbols), 200):
-            batch = symbols[i:i + 200]
-            # Suscribirse a klines de 1 hora
-            stream_name = "/".join([f"{symbol.lower()}@kline_1h" for symbol in batch])
-            streams.append(stream_name)
-        
-        # Iniciar streams
-        for stream in streams:
-            self.start_websocket(stream)
-        
-        logger.info(f"🎯 {len(streams)} streams WebSocket iniciados")
-    
+
+        # Binance recomienda máximo 1024 streams por conexión
+        BATCH_SIZE = 1024
+
+        for i in range(0, len(symbols), BATCH_SIZE):
+            batch = symbols[i:i + BATCH_SIZE]
+            logger.info(f"🔍 Procesando batch {i//BATCH_SIZE + 1}: {len(batch)} símbolos")
+
+            # Construye la cadena para streams combinados con el separador `/`
+            stream_parts = [f"{symbol.lower()}@kline_1h" for symbol in batch]
+            stream_name = "/".join(stream_parts)
+            logger.info(f"🔍 Streams en este batch: {stream_name[:100]}... (total {len(stream_parts)})")
+
+            self.start_websocket(stream_name)
+
+        logger.info(f"🎯 Streams WebSocket iniciados para todos los batches")
+
     def start_websocket(self, stream_name: str) -> None:
-        """Inicia una conexión WebSocket para un conjunto de streams"""
-        ws_url = f"{self.config.binance.ws_url}{stream_name}"
-        
+        # Construye la URL siguiendo el estándar de Binance para streams combinados
+        ws_url = f"{self.config.binance.ws_url}/stream?streams={stream_name}"
+
+        logger.info(f"🔗 URL WebSocket completa: {ws_url}")
+        if len(ws_url) > 4000:
+            logger.warning(f"⚠️ URL muy larga ({len(ws_url)} caracteres): podrías tener problemas de límite")
+
         def on_message(ws, message):
+            logger.debug(f"🔔 Mensaje RAW recibido de WebSocket: {message}")
             try:
                 data = json.loads(message)
-                
-                # Ignorar mensajes de control (como confirmaciones de suscripción)
-                # Solo procesar mensajes que contienen datos de un stream
-                if 'data' not in data:
-                    logger.debug(f"🔔 Mensaje de control de WebSocket recibido: {data}")
-                    return
-
-                stream_name = data.get('stream', '')
-                stream_type = stream_name.split('@')[-1] if '@' in stream_name else ''
-                
-                if stream_type in self.message_handlers:
-                    self.message_handlers[stream_type](data)
+                # Mensaje tipo combined stream de Binance
+                if 'stream' in data and 'data' in data:
+                    full_stream = data.get('stream', '')
+                    stream_type = full_stream.split('@')[-1] if '@' in full_stream else ''
+                    if stream_type in self.message_handlers:
+                        self.message_handlers[stream_type](data)
+                    else:
+                        logger.warning(f"⚠️ No hay manejador para el stream type: '{stream_type}' (stream: '{full_stream}')")
                 else:
-                    # Este warning ahora es más útil, ya que solo aparecerá para streams no registrados
-                    logger.warning(f"⚠️ No hay manejador para el stream type: '{stream_type}' (stream: '{stream_name}')")
+                    logger.debug(f"🔔 Mensaje de control o estructura diferente: {data}")
             except Exception as e:
                 logger.error(f"❌ Error procesando mensaje WebSocket: {e}")
-                
-        
+
         def on_error(ws, error):
-            logger.error(f"❌ WebSocket error para {stream_name}: {error}")
-        
+            logger.error(f"❌ WebSocket error para stream: {error}")
+
         def on_close(ws, close_status_code, close_msg):
-            logger.warning(f"🔌 WebSocket cerrado: {stream_name}")
+            logger.warning(f"🔌 WebSocket cerrado")
             if self.running:
-                logger.info(f"🔄 Reconectando {stream_name} en 5 segundos...")
+                logger.info(f"🔄 Reconectando en 5 segundos...")
                 time.sleep(5)
                 self.start_websocket(stream_name)
-        
+
         def on_open(ws):
-            logger.info(f"✅ WebSocket conectado: {stream_name}")
-        
+            logger.info(f"✅ WebSocket conectado exitosamente")
+
         ws = websocket.WebSocketApp(
             ws_url,
             on_open=on_open,
@@ -90,19 +89,17 @@ class WebSocketManager:
             on_error=on_error,
             on_close=on_close
         )
-        
-        # Ejecutar en hilo separado
+
         thread = threading.Thread(
             target=ws.run_forever,
-            name=f"WebSocket-{stream_name[:20]}",
+            name=f"WebSocket-{hash(stream_name) % 10000}",
             daemon=True
         )
         thread.start()
-        
+
         self.websockets[stream_name] = ws
-    
+
     def stop(self) -> None:
-        """Detiene todos los WebSockets"""
         self.running = False
         for ws in self.websockets.values():
             try:

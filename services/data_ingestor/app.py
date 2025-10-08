@@ -29,8 +29,8 @@ class DataIngestorApp:
         """Ejecutar la aplicación"""
         try:
             logger.info("🚀 Iniciando Binance Data Ingestor")
-            logger.info(f"📍 Kafka: {self.config.kafka.bootstrap_servers}")
-            logger.info(f"📍 NATS: {self.config.nats.url}")
+            # logger.info(f"📍 Kafka: {self.config.kafka.bootstrap_servers}")
+            # logger.info(f"📍 NATS: {self.config.nats.url}")
             logger.info(f"📊 Tópico: {self.config.kafka.topic_name}")
             logger.info(f"⏱️  Agregación: {self.config.app.aggregation_interval}s")
             

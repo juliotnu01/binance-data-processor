@@ -9,7 +9,7 @@ class KafkaConfig:
 
 @dataclass
 class BinanceConfig:
-    ws_url: str = os.getenv('BINANCE_WS_URL', 'wss://fstream.binance.com/ws/')
+    ws_url: str = os.getenv('BINANCE_WS_URL', 'wss://fstream.binance.com')
     api_base: str = os.getenv('BINANCE_API_BASE', 'https://fapi.binance.com')
     api_key: str = os.getenv('BINANCE_API_KEY', '')
     api_secret: str = os.getenv('BINANCE_API_SECRET', '')
