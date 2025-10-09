@@ -101,36 +101,43 @@ class MarketDataService:
             batch_delay=self.config.app.batch_delay
         )
         
-        for pair in self.market_data.pairs:
-            if not pair.candles:
-                continue
+        for pair in self.market_data.pairs:  
+            if not pair.candles:  
+                continue  
             
-            logger.info(f"📦 Publicando {len(pair.candles)} velas históricas para {pair.symbol}...")
-            for candle in pair.candles:
-                candle_event = {
-                    'event_type': 'historical_kline',
-                    'symbol': pair.symbol,
-                    'is_closed': True,
-                    'time': candle.time,
-                    'open': candle.open,
-                    'high': candle.high,
-                    'low': candle.low,
-                    'close': candle.close,
-                    'volume': candle.volume,
-                    'quote_volume': candle.quote_volume,
-                    'trades': candle.trades,
-                    'taker_buy_volume': candle.taker_buy_volume,
-                    'taker_buy_quote_volume': candle.taker_buy_quote_volume,
-                    'timestamp': candle.close_time
-                }
-            
-            # Publicar evento de finalización
-        end_event = {
-            'event_type': 'historical_data_loaded',
-            'total_pairs_with_candles': len([p for p in self.market_data.pairs if p.candles]),
-            'timestamp': int(time.time() * 1000)
-        }
-        self.kafka_publisher.publish(self.config.kafka.topic_historical_klines, end_event)
+            logger.info(f"📦 Publicando {len(pair.candles)} velas históricas para {pair.symbol}...")  
+            for candle in pair.candles:  
+                candle_event = {  
+                    'event_type': 'historical_kline',  
+                    'symbol': pair.symbol,  
+                    'is_closed': True,  
+                    'time': candle.time,  
+                    'open': candle.open,  
+                    'high': candle.high,  
+                    'low': candle.low,  
+                    'close': candle.close,  
+                    'volume': candle.volume,  
+                    'quote_volume': candle.quote_volume,  
+                    'trades': candle.trades,  
+                    'taker_buy_volume': candle.taker_buy_volume,  
+                    'taker_buy_quote_volume': candle.taker_buy_quote_volume,  
+                    'timestamp': candle.close_time  
+                }  
+                
+                # MOVER ESTE BLOQUE DENTRO DEL LOOP (4 espacios más de indentación)  
+                self.kafka_publisher.publish(    
+                    self.config.kafka.topic_historical_klines,     
+                    candle_event,     
+                    key=pair.symbol    
+                )  
+        
+        # Publicar evento de finalización (FUERA de ambos loops)  
+        end_event = {  
+            'event_type': 'historical_data_loaded',  
+            'total_pairs_with_candles': len([p for p in self.market_data.pairs if p.candles]),  
+            'timestamp': int(time.time() * 1000)  
+        }  
+        self.kafka_publisher.publish(self.config.kafka.topic_historical_klines, end_event)  
         logger.info("✅ Carga y publicación de datos históricos completada.")
 
     # Eliminamos los métodos de publicación periódica y de NATS

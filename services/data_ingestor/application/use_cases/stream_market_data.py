@@ -21,10 +21,9 @@ class StreamMarketDataUseCase:
             kline_data = data['data']['k']
             symbol = kline_data['s']
             is_kline_closed = kline_data['x']
-            event_type = data['data']['e']
 
             candle_event = {
-                'event_type': event_type,
+                'event_type': "realtime_klines",
                 'symbol': symbol,
                 'is_closed': is_kline_closed,
                 'time': int(kline_data['t']),

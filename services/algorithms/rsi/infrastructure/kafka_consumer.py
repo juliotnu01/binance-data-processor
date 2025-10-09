@@ -12,29 +12,27 @@ class KafkaRSIConsumer:
     Un consumidor de Kafka robusto y configurable para el servicio de RSI.
     Se encarga de leer mensajes de un tópico de entrada y pasarlos a un manejador.
     """
-    def __init__(self, config: Config, message_handler: Callable):
-        """
-        Inicializa el consumidor de Kafka.
-
-        Args:
-            config (Config): El objeto de configuración de la aplicación.
-            message_handler (Callable): Una función que será llamada para cada mensaje consumido.
-            Debe aceptar un objeto mensaje de Kafka como argumento.
-        """
-        self.config = config
-        self.message_handler = message_handler
-        self.running = True
+    def __init__(self, topics: List[str], message_handler: Callable):  
+        self.config = config  
+        self.message_handler = message_handler  
+        self.running = True  
         
-        logger.info(f"🔌 Conectando consumidor de Kafka al tópico '{self.config.kafka.input_topic}'...")
-        self.consumer = KafkaConsumer(
-            self.config.kafka.input_topic,
-            bootstrap_servers=self.config.kafka.bootstrap_servers,  # Ejemplo: "kafka:29092"
-            group_id=self.config.kafka.consumer_group_id,
-            value_deserializer=lambda v: json.loads(v.decode('utf-8')),
-            key_deserializer=lambda k: k.decode('utf-8') if k else None,
-            auto_offset_reset='earliest',
-            enable_auto_commit=False
-        )
+        # Consumir de ambos tópicos  
+        topics = [  
+            self.config.kafka.topic_historical_klines,  
+            self.config.kafka.topic_realtime_klines  
+        ]  
+        
+        logger.info(f"🔌 Conectando consumidor de Kafka a tópicos: {topics}")  
+        self.consumer = KafkaConsumer(  
+            *topics,  
+            bootstrap_servers=self.config.kafka.bootstrap_servers,  
+            group_id=self.config.kafka.consumer_group_id,  
+            value_deserializer=lambda v: json.loads(v.decode('utf-8')),  
+            key_deserializer=lambda k: k.decode('utf-8') if k else None,  
+            auto_offset_reset='earliest',  
+            enable_auto_commit=False  
+        )  
         logger.info("✅ Consumidor de Kafka inicializado correctamente.")
 
     def run(self):
